@@ -1,3 +1,0 @@
-image,lime_precision,lime_iou,intersection_pixels,predicted_area,ground_truth_area
-Abyssinian_1.jpg,0.4783473265576668,0.19688977810112768,2165,4526,8635
-Abyssinian_10.jpg,0.20033342595165324,0.04356758716538764,721,3599,13671
