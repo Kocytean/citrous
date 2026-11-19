@@ -24,7 +24,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 # ---------------------------------------------------------
 
 CHECKPOINT_PATH = "best_resnet18_oxford_pet.pth"
-IMAGE_PATH = "./data/oxford-iiit-pet/images/Abyssinian_2.jpg"
+IMAGE_PATH = "./data/oxford-iiit-pet/images/Abyssinian_3.jpg"
 
 NUM_CLASSES = 37           # Must match the checkpoint
 IMAGE_SIZE = 224

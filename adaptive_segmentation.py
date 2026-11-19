@@ -517,7 +517,7 @@ def grow_exterior(
             else:
                 category = 2
                 reason = "combined_mask_changes_decision_contextually"
-
+            print(reason)
             update_membership(
                 memberships, neighbor_mask, category, alpha
             )
@@ -540,6 +540,7 @@ def grow_exterior(
         # neighbor supports the target and should not be absorbed
         # automatically into the exterior.
         if conditional_drop > min_score_drop:
+            print(f'conditional drop {conditional_drop}')
             update_membership(
                 memberships, neighbor_mask, 0, alpha
             )
@@ -921,7 +922,7 @@ def merge_and_test_boundary(
 
         # Ensure future merge priorities use the latest boundary map.
         lattice.update_priority(memberships[..., 2])
-
+        # print(reason)
         results.append({
             "merged_id": merged_id,
             "children": (selected_candidate["u"],
