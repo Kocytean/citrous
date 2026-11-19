@@ -1,4 +1,3 @@
-
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -26,9 +25,41 @@ CHECKPOINT_PATH = "best_resnet18_oxford_pet.pth"
 
 IMAGE_DIR = Path("./data/oxford-iiit-pet/images")
 TRIMAP_DIR = Path("./data/oxford-iiit-pet/annotations/trimaps")
+import re
+from collections import defaultdict
 
-IMAGE_PATHS = sorted(IMAGE_DIR.glob("*.jpg"))[:30]
+def get_balanced_image_paths(image_dir, images_per_class=5):
+    class_images = defaultdict(list)
 
+    for image_path in sorted(image_dir.glob("*.jpg")):
+        class_name = re.sub(r"_\d+$", "", image_path.stem).lower()
+        class_images[class_name].append(image_path)
+
+    image_paths = []
+
+    for class_name in sorted(class_images):
+        images = class_images[class_name]
+
+        if len(images) < images_per_class:
+            raise ValueError(
+                f"Class {class_name} has only {len(images)} images."
+            )
+
+        image_paths.extend(images[:images_per_class])
+
+    print(f"Selected {len(image_paths)} images from "
+          f"{len(class_images)} classes.")
+
+    for class_name in sorted(class_images):
+        print(f"{class_name}: {min(len(class_images[class_name]), images_per_class)} images")
+
+    return image_paths
+
+
+IMAGE_PATHS = get_balanced_image_paths(
+    IMAGE_DIR,
+    images_per_class=5
+)
 NUM_CLASSES = 37
 IMAGE_SIZE = 224
 
@@ -272,16 +303,8 @@ def get_positive_lime_mask(
     """
 
     segments = explanation.segments
-
-    # Local explanation: list of (superpixel_id, weight).
     local_weights = explanation.local_exp[target_class]
-
-    # Keep only positively weighted features.
-    positive_features = [
-        (segment_id, weight)
-        for segment_id, weight in local_weights
-        if weight > 0
-    ]
+    positive_features = [(segment_id, weight) for segment_id, weight in local_weights if weight > 0]
 
     # Select the strongest positive features.
     positive_features = sorted(
@@ -527,8 +550,7 @@ plt.bar(
 
 plt.ylabel("Score")
 plt.title(
-    f"LIME Performance on {len(IMAGE_PATHS)} Images"
-)
+    f"LIME Performance on {len(IMAGE_PATHS)} Images")
 
 plt.ylim(0, 1)
 plt.grid(axis="y", alpha=0.3)
@@ -572,4 +594,5 @@ if first_result is not None:
         ax.axis("off")
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig('lime.png', dpi=300, bbox_inches='tight')
+    plt.close()

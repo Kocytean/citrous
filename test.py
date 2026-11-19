@@ -1,4 +1,3 @@
-
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -34,10 +33,48 @@ CHECKPOINT_PATH = "best_resnet18_oxford_pet.pth"
 from pathlib import Path
 
 IMAGE_DIR = Path("./data/oxford-iiit-pet/images")
+import re
+from collections import defaultdict
 
-IMAGE_PATHS = sorted(
-    list(IMAGE_DIR.glob("*.jpg"))
-)[:30]
+def get_balanced_image_paths(image_dir, images_per_class=5):
+    class_images = defaultdict(list)
+
+    for image_path in sorted(image_dir.glob("*.jpg")):
+        # Extract breed name by removing the trailing image number.
+        # Examples:
+        # Abyssinian_1.jpg -> abyssinian
+        # american_bulldog_12.jpg -> american_bulldog
+        class_name = re.sub(r"_\d+$", "", image_path.stem).lower()
+        class_images[class_name].append(image_path)
+
+    image_paths = []
+
+    for class_name in sorted(class_images):
+        images = class_images[class_name]
+
+        if len(images) < images_per_class:
+            raise ValueError(
+                f"Class {class_name} has only {len(images)} images."
+            )
+
+        image_paths.extend(images[:images_per_class])
+
+    print(f"Selected {len(image_paths)} images from "
+          f"{len(class_images)} classes.")
+
+    for class_name in sorted(class_images):
+        print(f"{class_name}: {min(len(class_images[class_name]), images_per_class)} images")
+
+    return image_paths
+
+
+IMAGE_PATHS = get_balanced_image_paths(
+    IMAGE_DIR,
+    images_per_class=5
+)
+#IMAGE_PATHS = sorted(
+#    list(IMAGE_DIR.glob("*.jpg"))
+#)[:30]
 
 # Oxford-IIIT Pet annotation directory.
 TRIMAP_DIR = Path("./data/oxford-iiit-pet/annotations/trimaps")
@@ -203,48 +240,48 @@ def load_image_and_mask(image_path):
 def calculate_segmentation_metrics(memberships, gt_mask):
 
     if not np.isfinite(memberships).all():
-        raise ValueError(
-            "Memberships contain NaN or Inf. "
-            "Check membership updates before calculating metrics."
-        )
-
-    if not np.isfinite(gt_mask).all():
-        raise ValueError("Ground-truth mask contains NaN or Inf.")
+        raise ValueError("Memberships contain NaN or Inf.")
 
     predicted_labels = np.argmax(memberships, axis=-1)
 
-    # interior = predicted_labels == 0
-    # interior_boundary = (
-    #     (predicted_labels == 0) |
-    #     (predicted_labels == 2)
-    # )
+    # Use the same threshold as your current experiment.
     interior = memberships[..., 0] > 0.5
 
     interior_boundary = (
         (memberships[..., 0] + memberships[..., 2]) > 0.5
     )
+
     gt = gt_mask.astype(bool)
 
-    interior_intersection = int(
-        np.logical_and(interior, gt).sum()
-    ) / (int(interior.sum()) +0.0001)
+    # A = interior, B = ground truth
+    interior_intersection = np.logical_and(
+        interior, gt
+    ).sum()
 
+    interior_area = interior.sum()
+
+    interior_confidence = (
+        interior_intersection / interior_area
+        if interior_area > 0 else 0.0
+    )
+
+    # Interior + boundary IoU
     combined_intersection = np.logical_and(
         interior_boundary, gt
     ).sum()
 
     combined_union = np.logical_or(
         interior_boundary, gt
-    ).sum() +0.0001
+    ).sum()
 
     combined_iou = (
-        float(combined_intersection / combined_union)
+        combined_intersection / combined_union
         if combined_union > 0 else 0.0
     )
 
     return {
-        "interior_intersection": interior_intersection,
-        "interior_boundary_iou": combined_iou,
+        "interior_intersection": float(interior_confidence),
+        "interior_boundary_iou": float(combined_iou),
     }
 # ---------------------------------------------------------
 # 5. Run adaptive inference on one image
@@ -619,7 +656,7 @@ plt.ylim(0, 1)
 plt.grid(True)
 plt.legend()
 plt.tight_layout()
-plt.show()
+plt.savefig('citrous_metrics.png', dpi=300, bbox_inches='tight')
 
 
 # ---------------------------------------------------------
